@@ -1,0 +1,179 @@
+# Prometheus alerting rules for auto-scaling and high availability
+# Defines thresholds for scaling decisions and operational alerts
+
+groups:
+  - name: telemetry_scaling
+    rules:
+      # High CPU usage - scale up trigger
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name=~"telemetry-service-.*"}[5m]) * 100 > 70
+        for: 2m
+        labels:
+          severity: warning
+          component: telemetry-service
+          action: scale-up
+        annotations:
+          summary: "High CPU usage detected on {{ $labels.name }}"
+          description: "CPU usage is {{ $value }}% for container {{ $labels.name }}"
+
+      # High memory usage - scale up trigger
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{name=~"telemetry-service-.*"} / container_spec_memory_limit_bytes) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+          component: telemetry-service
+          action: scale-up
+        annotations:
+          summary: "High memory usage detected on {{ $labels.name }}"
+          description: "Memory usage is {{ $value }}% for container {{ $labels.name }}"
+
+      # Service response time - performance degradation
+      - alert: HighResponseTime
+        expr: telemetry_collection_duration_seconds > 30
+        for: 1m
+        labels:
+          severity: warning
+          component: telemetry-service
+          action: scale-up
+        annotations:
+          summary: "High telemetry collection response time"
+          description: "Collection duration is {{ $value }}s, exceeding 30s threshold"
+
+      # Queue depth - backlog indicator
+      - alert: HighQueueDepth
+        expr: telemetry_queue_depth > 100
+        for: 30s
+        labels:
+          severity: warning
+          component: telemetry-service
+          action: scale-up
+        annotations:
+          summary: "High queue depth in telemetry service"
+          description: "Queue depth is {{ $value }}, indicating processing backlog"
+
+      # Error rate increase - reliability issue
+      - alert: HighErrorRate
+        expr: rate(telemetry_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: telemetry-service
+          action: investigate
+        annotations:
+          summary: "High error rate in telemetry collection"
+          description: "Error rate is {{ $value }} errors/second"
+
+  - name: database_scaling
+    rules:
+      # InfluxDB high write load
+      - alert: InfluxDBHighWriteLoad
+        expr: rate(influxdb_write_requests_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+          component: influxdb
+          action: scale-up
+        annotations:
+          summary: "High write load on InfluxDB"
+          description: "Write rate is {{ $value }} requests/second"
+
+      # InfluxDB disk usage
+      - alert: InfluxDBHighDiskUsage
+        expr: (disk_used_bytes / disk_total_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: influxdb
+          action: scale-storage
+        annotations:
+          summary: "High disk usage on InfluxDB"
+          description: "Disk usage is {{ $value }}%"
+
+      # InfluxDB query performance
+      - alert: InfluxDBSlowQueries
+        expr: influxdb_query_duration_seconds > 10
+        for: 1m
+        labels:
+          severity: warning
+          component: influxdb
+          action: optimize
+        annotations:
+          summary: "Slow queries detected in InfluxDB"
+          description: "Query duration is {{ $value }}s"
+
+  - name: high_availability
+    rules:
+      # Service instance down
+      - alert: ServiceInstanceDown
+        expr: up{job=~"network-telemetry|influxdb|grafana"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: "{{ $labels.job }}"
+          action: restart
+        annotations:
+          summary: "Service instance is down"
+          description: "{{ $labels.job }} instance {{ $labels.instance }} is not responding"
+
+      # Load balancer backend down
+      - alert: LoadBalancerBackendDown
+        expr: haproxy_backend_up == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: haproxy
+          action: failover
+        annotations:
+          summary: "Load balancer backend is down"
+          description: "Backend {{ $labels.backend }} is not available"
+
+      # Circuit breaker open
+      - alert: CircuitBreakerOpen
+        expr: telemetry_circuit_breaker_state == 2  # OPEN state
+        for: 1m
+        labels:
+          severity: warning
+          component: telemetry-service
+          action: investigate
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker {{ $labels.breaker_name }} is open, blocking requests"
+
+  - name: performance_thresholds
+    rules:
+      # Network latency increase
+      - alert: NetworkLatencyHigh
+        expr: telemetry_rtt_avg_ms > 200
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+          action: investigate
+        annotations:
+          summary: "High network latency detected"
+          description: "Average RTT is {{ $value }}ms for target {{ $labels.target }}"
+
+      # Packet loss increase
+      - alert: PacketLossHigh
+        expr: telemetry_packet_loss_percent > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: network
+          action: investigate
+        annotations:
+          summary: "High packet loss detected"
+          description: "Packet loss is {{ $value }}% for target {{ $labels.target }}"
+
+      # Connection pool exhaustion
+      - alert: ConnectionPoolExhaustion
+        expr: telemetry_connection_pool_active / telemetry_connection_pool_max > 0.9
+        for: 1m
+        labels:
+          severity: warning
+          component: telemetry-service
+          action: scale-up
+        annotations:
+          summary: "Connection pool near exhaustion"
+          description: "{{ $value }} of connection pool capacity is in use"

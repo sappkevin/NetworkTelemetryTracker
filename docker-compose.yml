@@ -1,0 +1,73 @@
+# Docker Compose file for Network Telemetry Service
+# Note: version field is deprecated in newer Docker Compose versions
+
+services:
+  influxdb2:
+    image: influxdb:2
+    container_name: influxdb2
+    ports:
+      - "8086:8086"
+    volumes:
+      - type: bind
+        source: ./influxdb2_data
+        target: /var/lib/influxdb2
+      - type: bind
+        source: ./influxdb2_config
+        target: /etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin123!
+      - DOCKER_INFLUXDB_INIT_ORG=nflx
+      - DOCKER_INFLUXDB_INIT_BUCKET=default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin123!}
+      - GF_SECURITY_SECRET_KEY=${GF_SECURITY_SECRET_KEY:-your-secret-key-here}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,grafana-worldmap-panel,grafana-piechart-panel
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+    depends_on:
+      influxdb2:
+        condition: service_healthy
+
+  network-telemetry:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: network-telemetry
+    environment:
+      - TARGET_FQDN=${TARGET_FQDN:-google.com}
+      - INFLUXDB_URL=http://influxdb2:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-your-admin-token-here}
+      - INFLUXDB_ORG=nflx
+      - INFLUXDB_BUCKET=default
+      - MONITORING_INTERVAL=${MONITORING_INTERVAL:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      influxdb2:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+      - ./influxdb2_config:/etc/influxdb2:ro  # Mount InfluxDB config as read-only
+
+volumes:
+  grafana_data:

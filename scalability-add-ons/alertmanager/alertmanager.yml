@@ -1,0 +1,114 @@
+# AlertManager configuration for Network Telemetry Service
+# Handles alert routing, grouping, and notification delivery
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'telemetry-alerts@netflix.com'
+  
+# Route configuration
+route:
+  group_by: ['alertname', 'component']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 15m
+    
+    # Scaling alerts - automation hooks
+    - match:
+        action: scale-up
+      receiver: 'scaling-automation'
+      group_wait: 30s
+      repeat_interval: 5m
+    
+    # High availability alerts
+    - match:
+        component: haproxy
+      receiver: 'ha-alerts'
+      
+    # Database alerts
+    - match:
+        component: influxdb
+      receiver: 'database-alerts'
+
+# Notification receivers
+receivers:
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://telemetry-webhook:8080/alerts'
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'sre-team@netflix.com'
+        subject: '[CRITICAL] Telemetry Service Alert'
+        body: |
+          Alert: {{ .GroupLabels.alertname }}
+          Severity: {{ .CommonLabels.severity }}
+          Component: {{ .CommonLabels.component }}
+          
+          {{ range .Alerts }}
+          - {{ .Annotations.summary }}
+            {{ .Annotations.description }}
+          {{ end }}
+    
+    webhook_configs:
+      - url: 'http://pagerduty-webhook:8080/critical'
+        send_resolved: true
+
+  - name: 'scaling-automation'
+    webhook_configs:
+      - url: 'http://kubernetes-scaler:8080/scale'
+        send_resolved: false
+        http_config:
+          basic_auth:
+            username: 'scaler'
+            password: 'scaler-token'
+
+  - name: 'ha-alerts'
+    email_configs:
+      - to: 'infrastructure-team@netflix.com'
+        subject: '[HA] Load Balancer Alert'
+        body: |
+          High Availability Issue Detected
+          
+          {{ range .Alerts }}
+          - {{ .Annotations.summary }}
+          {{ end }}
+
+  - name: 'database-alerts'
+    email_configs:
+      - to: 'database-team@netflix.com'
+        subject: '[DB] InfluxDB Alert'
+        body: |
+          Database Performance Issue
+          
+          {{ range .Alerts }}
+          - {{ .Annotations.summary }}
+            {{ .Annotations.description }}
+          {{ end }}
+
+# Inhibition rules - prevent spam
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']
+
+  - source_match:
+      alertname: 'ServiceInstanceDown'
+    target_match_re:
+      alertname: '(HighCPUUsage|HighMemoryUsage|HighResponseTime)'
+    equal: ['instance']
+
+# Notification templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

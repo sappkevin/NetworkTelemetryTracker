@@ -1,0 +1,20 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb2:8086
+    user: admin
+    password: admin123!
+    database: default
+    jsonData:
+      version: Flux
+      organization: nflx
+      defaultBucket: default
+      tlsSkipVerify: true
+      httpMode: POST
+      # Use basic auth initially, can be updated to token auth later
+    isDefault: true
+    editable: true
+    version: 1

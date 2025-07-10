@@ -1,0 +1,84 @@
+# Prometheus configuration for Network Telemetry Service monitoring
+# Collects metrics for scaling decisions and operational monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Network Telemetry Service instances
+  - job_name: 'network-telemetry'
+    static_configs:
+      - targets: 
+        - 'network-telemetry-1:8080'
+        - 'network-telemetry-2:8080'
+        - 'network-telemetry-3:8080'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # InfluxDB monitoring
+  - job_name: 'influxdb'
+    static_configs:
+      - targets:
+        - 'influxdb-1:8086'
+        - 'influxdb-2:8086'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Grafana monitoring
+  - job_name: 'grafana'
+    static_configs:
+      - targets:
+        - 'grafana-1:3000'
+        - 'grafana-2:3000'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # HAProxy load balancer
+  - job_name: 'haproxy'
+    static_configs:
+      - targets:
+        - 'load-balancer:8404'
+    metrics_path: '/stats/prometheus'
+    scrape_interval: 30s
+
+  # Redis caching
+  - job_name: 'redis'
+    static_configs:
+      - targets:
+        - 'redis:6379'
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+        - 'localhost:9090'
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+        - 'node-exporter:9100'
+    scrape_interval: 30s
+
+  # Container metrics (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+        - 'cadvisor:8080'
+    scrape_interval: 30s
+
+# Remote write for long-term storage (optional)
+# remote_write:
+#   - url: "http://thanos-receiver:19291/api/v1/receive"
