@@ -13,6 +13,10 @@ Get started in under 2 minutes:
 git clone <repository>
 cd NetworkTelemetryTracker
 
+# Setup environment configuration
+cp .env.example .env
+# Edit .env file with your specific configuration (see Environment Setup below)
+
 # Start all services
 docker-compose up -d
 
@@ -41,6 +45,55 @@ open http://localhost:8086  # InfluxDB
 ```
 
 **✨ That's it!** The network monitoring system is now collecting metrics and displaying real-time dashboards
+
+## ⚙️ Environment Setup
+
+Before running the system, you need to configure your environment variables:
+
+### 1. Create Environment File
+```bash
+cp .env.example .env
+```
+
+### 2. Configure Required Settings
+Edit the `.env` file and update the following critical settings:
+
+#### **Security & Authentication** ⚠️
+```bash
+# Generate a strong password for Grafana admin
+GF_SECURITY_ADMIN_PASSWORD=your-secure-password-here
+
+# Generate a long random secret key (32+ characters)
+GF_SECURITY_SECRET_KEY=your-long-random-secret-key-minimum-32-characters
+
+# For Google OAuth 2FA (optional but recommended)
+GOOGLE_CLIENT_ID=your-google-client-id-here
+GOOGLE_CLIENT_SECRET=your-google-client-secret-here
+```
+
+#### **Database Configuration**
+```bash
+# Set a secure admin password for InfluxDB
+INFLUXDB_ADMIN_PASSWORD=your-secure-db-password
+
+# The InfluxDB token will be auto-generated on first run
+INFLUXDB_TOKEN=your-admin-token-here
+```
+
+#### **Monitoring Configuration**
+```bash
+# Set your target domain to monitor
+TARGET_FQDN=google.com
+
+# Adjust monitoring frequency (seconds)
+MONITORING_INTERVAL=60
+```
+
+### 3. Security Best Practices
+- **Never commit the `.env` file** to version control
+- Use strong, unique passwords for all services
+- Generate a cryptographically secure secret key for Grafana
+- Consider using Google OAuth for enhanced security
 
 ## 🎯 What This System Provides
 
