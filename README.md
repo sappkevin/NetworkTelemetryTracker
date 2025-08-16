@@ -1,6 +1,6 @@
 # Network Telemetry Tracker
 
-**Enterprise Network Monitoring System for Netflix SDE Teams**
+**Enterprise Network Monitoring System Demo**
 
 A comprehensive network monitoring solution that provides real-time performance analytics, geolocation intelligence, and quality-of-service metrics through modern observability infrastructure.
 
